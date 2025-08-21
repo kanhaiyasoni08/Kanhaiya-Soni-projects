@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laptop Finder Tool</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- SheetJS for XLSX parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #18181b !important;
+            color: #f3f4f6 !important;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #23232a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+        .loader {
+            border: 4px solid #23232a;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* --- Dark mode for results and comparison modal/table --- */
+        .results-dark-bg {
+            background: linear-gradient(135deg, #18181b 0%, #27272a 100%);
+        }
+        .card-dark-bg {
+            background: #23232a;
+        }
+        .comparison-modal-dark {
+            background: #18181b !important;
+            color: #f3f4f6;
+        }
+        .comparison-table-dark th, .comparison-table-dark td {
+            background: #23232a !important;
+            color: #f3f4f6 !important;
+            border-color: #444;
+        }
+        .comparison-table-dark th {
+            background: #27272a !important;
+        }
+        .bg-blackish {
+            background: #18181b !important;
+        }
+        .bg-blackish-2 {
+            background: #23232a !important;
+        }
+        .text-light {
+            color: #f3f4f6 !important;
+        }
+        .border-dark {
+            border-color: #444 !important;
+        }
+        /* Gradient button style */
+        .btn-gradient {
+            background: linear-gradient(to right, #2563eb, #a21caf) !important;
+            color: #fff !important;
+            border: none;
+            transition: filter 0.2s, box-shadow 0.2s;
+        }
+        .btn-gradient:hover, .btn-gradient:focus {
+            filter: brightness(1.1);
+            box-shadow: 0 4px 24px 0 #a21caf44;
+        }
+    </style>
+</head>
+<body class="bg-blackish text-light">
+
+    <!-- Home Screen Overlay -->
+    <div id="home-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-800">
+        <div class="text-center px-6 py-10 bg-blackish-2 rounded-3xl shadow-2xl border border-dark max-w-lg">
+            <div class="flex justify-center mb-6">
+                <span class="inline-block bg-blue-600 rounded-full p-5 shadow-lg animate-bounce">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h2a4 4 0 014 4v2M7 17v-2a4 4 0 00-4-4H1a4 4 0 00-4 4v2m16-6V7a4 4 0 00-8 0v4" />
+                    </svg>
+                </span>
+            </div>
+            <h1 class="text-5xl font-extrabold text-blue-400 mb-4 drop-shadow-lg">Laptop Finder Tool</h1>
+            <p class="text-lg text-gray-300 mb-8">Discover, filter, and compare the best laptops for your needs.<br>
+                <span class="text-blue-400 font-semibold">Start your search now!</span>
+            </p>
+            <button id="start-btn" class="btn-gradient font-bold py-3 px-12 rounded-full shadow-xl hover:scale-105 transition-all text-xl">
+                🚀 Get Started
+            </button>
+            <div class="mt-8 flex justify-center gap-4">
+                <div class="flex flex-col items-center">
+                    <span class="text-2xl text-blue-400">🔍</span>
+                    <span class="text-xs text-gray-400 mt-1">Powerful Filters</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <span class="text-2xl text-blue-400">⚡</span>
+                    <span class="text-xs text-gray-400 mt-1">Instant Results</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <span class="text-2xl text-blue-400">📊</span>
+                    <span class="text-xs text-gray-400 mt-1">Easy Comparison</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4 lg:p-8" id="main-content" style="filter: blur(2px); pointer-events: none;">
+        <!-- Header Section -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-light">💻 Laptop Finder Tool</h1>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Sidebar with Filters -->
+            <aside class="lg:w-1/4 bg-blackish-2 p-6 rounded-2xl shadow-lg h-fit sticky top-8">
+                <h2 class="text-2xl font-semibold mb-6 border-b border-dark pb-3 text-light">Filter Options</h2>
+                
+                <!-- Price Range Filter -->
+                <div class="mb-6">
+                    <label class="block text-md font-medium text-gray-300 mb-2">Price Range (INR)</label>
+                    <div class="flex items-center justify-between gap-4">
+                         <input type="number" id="min-price" placeholder="Min" class="w-full p-2 border border-dark bg-blackish-2 text-light rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                         <span class="text-gray-400">-</span>
+                         <input type="number" id="max-price" placeholder="Max" class="w-full p-2 border border-dark bg-blackish-2 text-light rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+                </div>
+
+                <!-- All other select filters will be generated here by JavaScript -->
+                <div id="filters-container" class="space-y-4"></div>
+            </aside>
+
+            <!-- Main Content for Results -->
+            <main class="lg:w-3/4">
+                <div id="results-summary" class="mb-4 text-gray-300"></div>
+                <div id="results-container" class="results-dark-bg grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <!-- Loader -->
+                    <div id="loader" class="col-span-full flex justify-center mt-16" style="display:none;">
+                        <div class="loader"></div>
+                    </div>
+                    <!-- Laptop cards will be inserted here by JavaScript -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Comparison Modal -->
+    <div id="comparison-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 hidden">
+        <div class="comparison-modal-dark rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-auto p-8 relative">
+            <button id="close-comparison" class="absolute top-4 right-4 text-gray-400 hover:text-red-600 text-2xl font-bold">&times;</button>
+            <h2 class="text-2xl font-bold mb-6 text-center">Laptop Comparison Table</h2>
+            <div id="comparison-table-container" class="overflow-auto"></div>
+        </div>
+    </div>
+
+    <!-- Compare Buttons -->
+    <div class="flex flex-col md:flex-row justify-center gap-4 mt-10 mb-10">
+        <button id="compare-matching-btn" class="btn-gradient font-semibold py-3 px-8 rounded-lg shadow-lg transition-colors text-lg">
+            Compare Matching Laptops
+        </button>
+    </div>
+
+    <script>
+        // --- Home Screen Logic ---
+        const homeScreen = document.getElementById('home-screen');
+        const startBtn = document.getElementById('start-btn');
+        const mainContent = document.getElementById('main-content');
+        startBtn.addEventListener('click', () => {
+            homeScreen.style.display = 'none';
+            mainContent.style.filter = '';
+            mainContent.style.pointerEvents = '';
+            document.body.style.overflow = '';
+        });
+        document.body.style.overflow = 'hidden';
+
+        // --- DOM Element References ---
+        const resultsContainer = document.getElementById('results-container');
+        const filtersContainer = document.getElementById('filters-container');
+        const minPriceInput = document.getElementById('min-price');
+        const maxPriceInput = document.getElementById('max-price');
+        const resultsSummary = document.getElementById('results-summary');
+        const loader = document.getElementById('loader');
+        const compareMatchingBtn = document.getElementById('compare-matching-btn');
+        const comparisonModal = document.getElementById('comparison-modal');
+        const comparisonTableContainer = document.getElementById('comparison-table-container');
+        const closeComparison = document.getElementById('close-comparison');
+
+        // --- State Management ---
+        let allLaptops = []; // To store the original dataset
+        const filterControls = {}; // To store references to filter select elements
+
+        // --- Setup Dynamic Filters ---
+        function setupFilters() {
+            filtersContainer.innerHTML = '';
+            Object.keys(filterControls).forEach(k => delete filterControls[k]);
+            // Define the columns we want to create filters for
+            const filterableColumns = ["Laptop Type", "CPU", "Brand", "GPU", "RAM", "ROM", "Display", "Display Type"];
+
+            // Set min/max for price inputs based on data
+            const prices = allLaptops.map(laptop => Number(laptop.Price)).filter(Boolean);
+            minPriceInput.min = Math.min(...prices);
+            minPriceInput.max = Math.max(...prices);
+            maxPriceInput.min = Math.min(...prices);
+            maxPriceInput.max = Math.max(...prices);
+
+            // Create a select dropdown for each column
+            filterableColumns.forEach(column => {
+                if (allLaptops.length > 0 && allLaptops[0][column] !== undefined) {
+                    // Get unique, sorted, non-null values from the data
+                    const options = [...new Set(allLaptops.map(item => item[column]).filter(Boolean))].sort();
+
+                    // Create the filter elements
+                    const filterWrapper = document.createElement('div');
+                    
+                    const label = document.createElement('label');
+                    label.className = "block text-md font-medium text-gray-300";
+                    label.textContent = column;
+
+                    const select = document.createElement('select');
+                    select.id = `filter-${column.replace(/\s+/g, '-')}`;
+                    select.className = "mt-1 block w-full p-2 border border-dark bg-blackish-2 text-light rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition";
+                    
+                    // Add the default "All" option
+                    const defaultOption = new Option(`All ${column}s`, 'All');
+                    select.add(defaultOption);
+
+                    // Add options from the dataset
+                    options.forEach(optionValue => {
+                        const option = new Option(optionValue, optionValue);
+                        select.add(option);
+                    });
+
+                    // Add an event listener to re-render on change
+                    select.addEventListener('change', renderLaptops);
+                    
+                    // Store the select element for later use
+                    filterControls[column] = select;
+
+                    // Append to the DOM
+                    filterWrapper.appendChild(label);
+                    filterWrapper.appendChild(select);
+                    filtersContainer.appendChild(filterWrapper);
+                }
+            });
+
+            // Add event listeners for price inputs
+            minPriceInput.addEventListener('input', renderLaptops);
+            maxPriceInput.addEventListener('input', renderLaptops);
+        }
+
+        // --- Render Laptop Cards based on Filters ---
+        function renderLaptops() {
+            // Get current filter values
+            const activeFilters = {};
+            for (const col in filterControls) {
+                activeFilters[col] = filterControls[col].value;
+            }
+            const minPrice = parseFloat(minPriceInput.value) || 0;
+            const maxPrice = parseFloat(maxPriceInput.value) || Infinity;
+
+            // Filter the laptop data
+            const filteredLaptops = allLaptops.filter(laptop => {
+                // Price check
+                const price = Number(laptop.Price);
+                if (isNaN(price) || price < minPrice || price > maxPrice) {
+                    return false;
+                }
+
+                // Check against each select filter
+                for (const col in activeFilters) {
+                    if (activeFilters[col] !== 'All' && laptop[col] != activeFilters[col]) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+
+            // Clear previous results
+            resultsContainer.innerHTML = '';
+            
+            // Update results summary
+            if (filteredLaptops.length > 0) {
+                 resultsSummary.innerHTML = `<h3 class="text-xl font-semibold">Showing ${filteredLaptops.length} matching laptops.</h3>`;
+            } else {
+                 resultsSummary.innerHTML = '';
+            }
+
+            // Display results
+            if (filteredLaptops.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="col-span-full bg-yellow-900 border border-yellow-700 text-yellow-200 px-4 py-3 rounded-lg text-center">
+                        <strong>No laptops found.</strong> Try adjusting your filters.
+                    </div>`;
+            } else {
+                filteredLaptops.forEach(laptop => {
+                    const card = document.createElement('div');
+                    card.className = "card-dark-bg rounded-2xl shadow-lg overflow-hidden transition-transform transform hover:-translate-y-1";
+                    card.innerHTML = `
+                        <div class="p-6">
+                            <h3 class="text-xl font-bold text-light truncate">${laptop.Model || 'N/A'}</h3>
+                            <p class="text-2xl font-semibold text-blue-400 my-2">₹${laptop.Price ? Number(laptop.Price).toLocaleString('en-IN') : 'N/A'}</p>
+                            <div class="mt-4 space-y-2 text-sm text-gray-300">
+                                <p><strong>CPU:</strong> ${laptop.CPU || 'N/A'}</p>
+                                <p><strong>GPU:</strong> ${laptop.GPU || 'N/A'}</p>
+                                <p><strong>RAM:</strong> ${laptop.RAM || 'N/A'}</p>
+                                <p><strong>Storage:</strong> ${laptop.ROM || 'N/A'}</p>
+                            </div>
+                            <div class="mt-6">
+                                 <a href="${laptop['Purchase Link'] || '#'}" target="_blank" rel="noopener noreferrer" 
+                                    class="btn-gradient w-full inline-block text-center font-semibold py-2 px-4 rounded-lg transition-colors">
+                                    View Deal
+                                 </a>
+                            </div>
+                        </div>
+                    `;
+                    resultsContainer.appendChild(card);
+                });
+            }
+        }
+
+        // --- XLSX File Handling (Integrated File) ---
+        async function loadIntegratedXLSX() {
+            loader.style.display = '';
+            resultsContainer.innerHTML = '';
+            resultsSummary.innerHTML = '';
+            filtersContainer.innerHTML = '';
+            allLaptops = [];
+            try {
+                // Fetch the file from the local path (must be served by a local server)
+                const response = await fetch('LFT DB.xlsx');
+                if (!response.ok) throw new Error('File not found or cannot be loaded.');
+                const data = await response.arrayBuffer();
+                const workbook = XLSX.read(data, { type: "array" });
+                // Use the first sheet
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                // Convert to JSON
+                let json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                // Normalize Price to number
+                json = json.map(row => ({
+                    ...row,
+                    Price: Number(row.Price) || 0
+                }));
+                allLaptops = json;
+                setupFilters();
+                renderLaptops();
+            } catch (error) {
+                resultsContainer.innerHTML = `
+                    <div class="col-span-full bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-center">
+                        <strong>Error:</strong> Could not load or parse the Excel file. Please check your file format or server setup.
+                    </div>`;
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // --- Comparison Table Feature (Matching/Filtered Laptops) ---
+        compareMatchingBtn.addEventListener('click', () => {
+            // Use the same filter logic as renderLaptops
+            const activeFilters = {};
+            for (const col in filterControls) {
+                activeFilters[col] = filterControls[col].value;
+            }
+            const minPrice = parseFloat(minPriceInput.value) || 0;
+            const maxPrice = parseFloat(maxPriceInput.value) || Infinity;
+
+            const filteredLaptops = allLaptops.filter(laptop => {
+                const price = Number(laptop.Price);
+                if (isNaN(price) || price < minPrice || price > maxPrice) return false;
+                for (const col in activeFilters) {
+                    if (activeFilters[col] !== 'All' && laptop[col] != activeFilters[col]) return false;
+                }
+                return true;
+            });
+
+            if (!filteredLaptops.length) {
+                comparisonTableContainer.innerHTML = `<div class="text-center text-red-400 font-semibold">No matching laptops to compare.</div>`;
+                comparisonModal.classList.remove('hidden');
+                return;
+            }
+            // Exclude 'Purchase Link' column from the comparison table
+            const allColumns = Array.from(new Set(filteredLaptops.flatMap(l => Object.keys(l))));
+            const columns = allColumns.filter(col => col !== 'Purchase Link');
+            let table = `<table class="comparison-table-dark min-w-full border text-xs md:text-sm">
+                <thead>
+                    <tr>
+                        ${columns.map(col => `<th class="border px-2 py-1 sticky top-0 z-10">${col}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredLaptops.map(laptop => `
+                        <tr>
+                            ${columns.map(col => `<td class="border px-2 py-1">${laptop[col] ?? ''}</td>`).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+            comparisonTableContainer.innerHTML = table;
+            comparisonModal.classList.remove('hidden');
+        });
+
+        closeComparison.addEventListener('click', () => {
+            comparisonModal.classList.add('hidden');
+        });
+
+        // Optional: Close modal on background click
+        comparisonModal.addEventListener('click', (e) => {
+            if (e.target === comparisonModal) {
+                comparisonModal.classList.add('hidden');
+            }
+        });
+
+        // --- Load the integrated Excel file on page load ---
+        window.addEventListener('DOMContentLoaded', loadIntegratedXLSX);
+    </script>
+</body>
+</html>
